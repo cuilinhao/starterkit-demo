@@ -171,7 +171,9 @@ export async function createCheckoutSession(
     });
 
     if (!response.ok) {
-      throw new Error("Failed to create checkout session");
+      const errorText = await response.text();
+      console.error("Creem API Error:", response.status, errorText);
+      throw new Error(`Failed to create checkout session: ${response.status}`);
     }
 
     const data = await response.json();

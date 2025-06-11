@@ -4,6 +4,7 @@ import { SubscriptionStatusCard } from "@/components/dashboard/subscription-stat
 import { CreditsBalanceCard } from "@/components/dashboard/credits-balance-card";
 import { QuickActionsCard } from "@/components/dashboard/quick-actions-card";
 
+
 export default async function DashboardPage() {
   const supabase = await createClient();
 
@@ -52,6 +53,8 @@ export default async function DashboardPage() {
           Manage your subscription and credits from your personal dashboard.
         </p>
       </div>
+
+
 
       {/* Stats Grid */}
       <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
