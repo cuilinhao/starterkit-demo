@@ -140,6 +140,31 @@ export async function createCheckoutSession(
   const requestId = `${userId}-${Date.now()}`;
   const apiUrl = process.env.CREEM_API_URL + "/checkouts";
   
+  // 记录详细的环境信息
+  const environmentInfo = {
+    CREEM_API_URL: process.env.CREEM_API_URL,
+    CREEM_SUCCESS_URL: process.env.CREEM_SUCCESS_URL,
+    CREEM_API_KEY: process.env.CREEM_API_KEY ? `${process.env.CREEM_API_KEY.substring(0, 8)}...` : 'NOT_SET',
+    NODE_ENV: process.env.NODE_ENV,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    timestamp: new Date().toISOString(),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+  };
+
+  const requestContext = {
+    action: 'createCheckoutSession',
+    productId,
+    email,
+    userId,
+    productType,
+    creditsAmount: credits_amount,
+    discountCode,
+    environment: environmentInfo,
+    requestId,
+    apiUrl
+  };
+  
   try {
     const requestBody: any = {
       product_id: productId,
@@ -170,7 +195,13 @@ export async function createCheckoutSession(
       userId,
       productType,
       apiUrl,
-      requestId
+      requestId,
+      requestBody: JSON.stringify(requestBody, null, 2),
+      headers: {
+        'x-api-key': process.env.CREEM_API_KEY ? `${process.env.CREEM_API_KEY.substring(0, 8)}...` : 'NOT_SET',
+        'Content-Type': 'application/json'
+      },
+      environment: environmentInfo
     });
 
     const response = await fetch(apiUrl, {
@@ -220,7 +251,14 @@ export async function createCheckoutSession(
         requestId,
         response: errorResponse,
         message: errorResponse?.message || errorResponse || `HTTP ${response.status} - ${response.statusText}`,
-        errorCode: errorResponse?.code || errorResponse?.error_code || `HTTP_${response.status}`
+        errorCode: errorResponse?.code || errorResponse?.error_code || `HTTP_${response.status}`,
+        requestBody: requestBody,
+        requestHeaders: {
+          'x-api-key': process.env.CREEM_API_KEY ? `${process.env.CREEM_API_KEY.substring(0, 8)}...` : 'NOT_SET',
+          'Content-Type': 'application/json'
+        },
+        environment: environmentInfo,
+        context: requestContext
       };
 
       throw detailedError;
@@ -258,7 +296,9 @@ export async function createCheckoutSession(
       message: error?.message || 'Unknown error',
       errorCode: 'NETWORK_ERROR',
       response: null,
-      originalError: error?.message || error
+      originalError: error?.message || error,
+      environment: environmentInfo,
+      context: requestContext
     };
     
     throw wrappedError;

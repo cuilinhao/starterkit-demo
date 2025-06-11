@@ -8,6 +8,7 @@ import { useUser } from "@/hooks/use-user";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { ErrorDialog } from "@/components/ui/error-dialog";
+import { CreemStatusDialog } from "@/components/ui/creem-status-dialog";
 import { useState } from "react";
 
 export default function Pricing() {
@@ -17,8 +18,10 @@ export default function Pricing() {
   const [errorDialog, setErrorDialog] = useState<{
     isOpen: boolean;
     error?: any;
-    retryAction?: () => void;
+    context?: any;
   }>({ isOpen: false });
+
+  const [creemStatusDialog, setCreemStatusDialog] = useState(false);
 
   const handleSubscribe = async (productId: string, discountCode?: string) => {
     if (!user || !user.email) {
@@ -47,19 +50,24 @@ export default function Pricing() {
     } catch (error: any) {
       console.error("Error creating checkout session:", error);
       
-      // 显示详细错误弹窗
-      if (error?.details) {
+      // 检查是否是Creem API认证问题
+      if (error?.details?.status === 401 || error?.message?.includes('401')) {
+        setCreemStatusDialog(true);
+      } else {
+        // 显示详细错误弹窗
         setErrorDialog({
           isOpen: true,
-          error: error.details,
-          retryAction: () => handleSubscribe(productId, discountCode)
-        });
-      } else {
-        // 兜底简单错误提示
-        toast({
-          title: "Error",
-          description: error?.message || "Failed to create checkout session. Please try again.",
-          variant: "destructive",
+          error: error,
+          context: error?.details?.context || {
+            action: 'handleSubscribe',
+            productId,
+            email: user.email,
+            userId: user.id,
+            productType: 'subscription',
+            creditsAmount: 0,
+            discountCode,
+            environment: error?.details?.environment
+          }
         });
       }
     }
@@ -96,19 +104,24 @@ export default function Pricing() {
     } catch (error: any) {
       console.error("Error creating checkout session:", error);
       
-      // 显示详细错误弹窗
-      if (error?.details) {
+      // 检查是否是Creem API认证问题
+      if (error?.details?.status === 401 || error?.message?.includes('401')) {
+        setCreemStatusDialog(true);
+      } else {
+        // 显示详细错误弹窗
         setErrorDialog({
           isOpen: true,
-          error: error.details,
-          retryAction: () => handleBuyCredits(productId, creditsAmount, discountCode)
-        });
-      } else {
-        // 兜底简单错误提示
-        toast({
-          title: "Error",
-          description: error?.message || "Failed to create checkout session. Please try again.",
-          variant: "destructive",
+          error: error,
+          context: error?.details?.context || {
+            action: 'handleBuyCredits',
+            productId,
+            email: user.email,
+            userId: user.id,
+            productType: 'credits',
+            creditsAmount,
+            discountCode,
+            environment: error?.details?.environment
+          }
         });
       }
     }
@@ -246,10 +259,15 @@ export default function Pricing() {
           isOpen={errorDialog.isOpen}
           onClose={() => setErrorDialog({ isOpen: false })}
           error={errorDialog.error}
-          onRetry={errorDialog.retryAction}
-          showSupport={true}
+          context={errorDialog.context}
         />
       )}
+
+      {/* Creem API状态对话框 */}
+      <CreemStatusDialog
+        isOpen={creemStatusDialog}
+        onClose={() => setCreemStatusDialog(false)}
+      />
     </section>
   );
 }

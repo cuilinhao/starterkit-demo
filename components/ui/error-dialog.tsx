@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import { Copy, Mail, AlertTriangle, Bug, Code } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -8,214 +11,310 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-// import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertTriangle, Copy, ExternalLink, RefreshCw } from "lucide-react";
-import { useState } from "react";
-import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ErrorDetails {
-  message: string;
   status?: number;
   statusText?: string;
   url?: string;
-  timestamp: string;
+  timestamp?: string;
   requestId?: string;
-  errorCode?: string;
-  stack?: string;
   response?: any;
+  message?: string;
+  errorCode?: string;
+  originalError?: any;
 }
 
 interface ErrorDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  error: ErrorDetails;
-  onRetry?: () => void;
-  showSupport?: boolean;
+  error: Error & { details?: ErrorDetails };
+  context?: {
+    action?: string;
+    productId?: string;
+    email?: string;
+    userId?: string;
+    productType?: string;
+    creditsAmount?: number;
+    discountCode?: string;
+    environment?: Record<string, string>;
+  };
 }
 
-export function ErrorDialog({ 
-  isOpen, 
-  onClose, 
-  error, 
-  onRetry, 
-  showSupport = true 
-}: ErrorDialogProps) {
+export function ErrorDialog({ isOpen, onClose, error, context }: ErrorDialogProps) {
   const [copied, setCopied] = useState(false);
-  const { toast } = useToast();
 
-  const copyErrorDetails = async () => {
-    const errorInfo = {
-      timestamp: error.timestamp,
-      message: error.message,
-      status: error.status,
-      statusText: error.statusText,
-      url: error.url,
-      requestId: error.requestId,
-      errorCode: error.errorCode,
-      response: error.response,
-    };
-
+  const formatJsonWithHighlight = (obj: any) => {
+    if (!obj) return "无数据";
+    if (typeof obj === "string") return obj;
+    
     try {
-      await navigator.clipboard.writeText(JSON.stringify(errorInfo, null, 2));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-      toast({
-        title: "Copied!",
-        description: "Error details copied to clipboard",
-      });
-    } catch (err) {
-      console.error("Failed to copy:", err);
+      return JSON.stringify(obj, null, 2);
+    } catch {
+      return String(obj);
     }
   };
 
-  const getStatusColor = (status?: number) => {
+  const getErrorSeverity = (status?: number) => {
     if (!status) return "destructive";
-    if (status >= 400 && status < 500) return "destructive";
     if (status >= 500) return "destructive";
-    return "secondary";
+    if (status >= 400) return "secondary";
+    return "default";
+  };
+
+  const getStatusBadgeColor = (status?: number) => {
+    if (!status) return "bg-gray-500";
+    if (status >= 500) return "bg-red-500";
+    if (status >= 400) return "bg-yellow-500";
+    if (status >= 300) return "bg-blue-500";
+    return "bg-green-500";
+  };
+
+  const errorData = {
+    basic: {
+      message: error.message,
+      timestamp: error.details?.timestamp || new Date().toISOString(),
+      requestId: error.details?.requestId,
+      errorCode: error.details?.errorCode,
+    },
+    http: {
+      status: error.details?.status,
+      statusText: error.details?.statusText,
+      url: error.details?.url,
+    },
+    response: error.details?.response,
+    request: context ? {
+      action: context.action,
+      productId: context.productId,
+      email: context.email,
+      userId: context.userId,
+      productType: context.productType,
+      creditsAmount: context.creditsAmount,
+      discountCode: context.discountCode,
+    } : null,
+    environment: context?.environment,
+    stack: error.stack,
+    originalError: error.details?.originalError
+  };
+
+  const fullErrorReport = {
+    timestamp: new Date().toISOString(),
+    error: errorData,
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown',
+    url: typeof window !== 'undefined' ? window.location.href : 'Unknown'
+  };
+
+  const copyErrorDetails = async () => {
+    try {
+      const reportText = JSON.stringify(fullErrorReport, null, 2);
+      await navigator.clipboard.writeText(reportText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('复制失败:', err);
+    }
+  };
+
+  const sendErrorReport = () => {
+    const subject = `支付错误报告 - ${error.details?.errorCode || 'UNKNOWN'}`;
+    const body = `错误详情：\n\n${JSON.stringify(fullErrorReport, null, 2)}`;
+    const mailtoUrl = `mailto:support@example.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(mailtoUrl);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh]">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-destructive" />
-            Payment Error
-          </DialogTitle>
-          <DialogDescription>
-            We encountered an error while processing your payment. Please review the details below.
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-red-500" />
+            <DialogTitle className="text-lg font-semibold">
+              支付处理错误
+            </DialogTitle>
+            {error.details?.status && (
+              <Badge 
+                variant="secondary" 
+                className={`${getStatusBadgeColor(error.details.status)} text-white`}
+              >
+                HTTP {error.details.status}
+              </Badge>
+            )}
+          </div>
+          <DialogDescription className="text-sm text-gray-600">
+            支付会话创建失败，以下是详细的错误信息和调试数据
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[50vh] overflow-y-auto pr-4">
-          <div className="space-y-4">
-            {/* Main Error Message */}
-            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
-              <h4 className="font-semibold text-destructive mb-2">Error Message</h4>
-              <p className="text-sm text-foreground">{error.message}</p>
-            </div>
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="overview">概览</TabsTrigger>
+            <TabsTrigger value="request">请求信息</TabsTrigger>
+            <TabsTrigger value="response">响应信息</TabsTrigger>
+            <TabsTrigger value="environment">环境信息</TabsTrigger>
+            <TabsTrigger value="debug">调试信息</TabsTrigger>
+          </TabsList>
 
-            {/* Status Information */}
-            {error.status && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Status Code</label>
-                  <div className="mt-1">
-                    <Badge variant={getStatusColor(error.status)}>
-                      {error.status}
-                    </Badge>
+          <div className="mt-4 h-96">
+            <TabsContent value="overview" className="h-full">
+              <div className="h-full overflow-y-auto">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">错误消息</label>
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                        <p className="text-sm text-red-800">{error.message}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">错误代码</label>
+                      <div className="p-3 bg-gray-50 border rounded-md">
+                        <code className="text-sm font-mono">{error.details?.errorCode || 'UNKNOWN'}</code>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                {error.statusText && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Status Text</label>
-                    <p className="text-sm font-mono mt-1">{error.statusText}</p>
-                  </div>
-                )}
-              </div>
-            )}
 
-            {/* Request Details */}
-            <div className="space-y-2">
-              <h4 className="font-semibold text-sm">Request Details</h4>
-              <div className="bg-muted/50 rounded-lg p-3 space-y-2 text-xs font-mono">
-                <div>
-                  <span className="text-muted-foreground">Timestamp:</span>{" "}
-                  <span className="text-foreground">{error.timestamp}</span>
-                </div>
-                {error.url && (
-                  <div>
-                    <span className="text-muted-foreground">URL:</span>{" "}
-                    <span className="text-foreground break-all">{error.url}</span>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">请求ID</label>
+                      <div className="p-3 bg-gray-50 border rounded-md">
+                        <code className="text-sm font-mono">{error.details?.requestId || '无'}</code>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">时间戳</label>
+                      <div className="p-3 bg-gray-50 border rounded-md">
+                        <code className="text-sm">{error.details?.timestamp || '无'}</code>
+                      </div>
+                    </div>
                   </div>
-                )}
-                {error.requestId && (
-                  <div>
-                    <span className="text-muted-foreground">Request ID:</span>{" "}
-                    <span className="text-foreground">{error.requestId}</span>
-                  </div>
-                )}
-                {error.errorCode && (
-                  <div>
-                    <span className="text-muted-foreground">Error Code:</span>{" "}
-                    <span className="text-foreground">{error.errorCode}</span>
-                  </div>
-                )}
-              </div>
-            </div>
 
-            {/* Response Details */}
-            {error.response && (
-              <div className="space-y-2">
-                <h4 className="font-semibold text-sm">Response Details</h4>
-                <div className="bg-muted/50 rounded-lg p-3">
-                  <pre className="text-xs font-mono whitespace-pre-wrap text-foreground">
-                    {typeof error.response === 'string' 
-                      ? error.response 
-                      : JSON.stringify(error.response, null, 2)
-                    }
-                  </pre>
+                  {error.details?.url && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">API端点</label>
+                      <div className="p-3 bg-gray-50 border rounded-md">
+                        <code className="text-sm break-all">{error.details.url}</code>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
+            </TabsContent>
 
-            {/* Common Solutions */}
-            <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-              <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">
-                Possible Solutions
-              </h4>
-              <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-                <li>• Check your internet connection and try again</li>
-                <li>• Verify your payment method is valid and has sufficient funds</li>
-                <li>• Clear your browser cache and cookies</li>
-                <li>• Try using a different browser or device</li>
-                {error.status === 401 && (
-                  <li>• Your session may have expired - please sign in again</li>
-                )}
-                {error.status && error.status >= 500 && (
-                  <li>• Our servers are experiencing issues - please try again later</li>
-                )}
-              </ul>
-            </div>
+            <TabsContent value="request" className="h-full">
+              <div className="h-full overflow-y-auto">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Code className="h-4 w-4" />
+                    <h3 className="font-medium">请求参数</h3>
+                  </div>
+                  <Textarea
+                    value={formatJsonWithHighlight(errorData.request)}
+                    readOnly
+                    className="font-mono text-xs min-h-[300px]"
+                    placeholder="无请求数据"
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="response" className="h-full">
+              <div className="h-full overflow-y-auto">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    <h3 className="font-medium">API响应</h3>
+                  </div>
+                  
+                  {error.details?.status && (
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">HTTP状态</label>
+                        <Badge variant={getErrorSeverity(error.details.status)}>
+                          {error.details.status} {error.details.statusText}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+
+                  <Textarea
+                    value={formatJsonWithHighlight(errorData.response)}
+                    readOnly
+                    className="font-mono text-xs min-h-[250px]"
+                    placeholder="无响应数据"
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="environment" className="h-full">
+              <div className="h-full overflow-y-auto">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Bug className="h-4 w-4" />
+                    <h3 className="font-medium">环境配置</h3>
+                  </div>
+                  <Textarea
+                    value={formatJsonWithHighlight(errorData.environment)}
+                    readOnly
+                    className="font-mono text-xs min-h-[300px]"
+                    placeholder="无环境数据"
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="debug" className="h-full">
+              <div className="h-full overflow-y-auto">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Bug className="h-4 w-4" />
+                    <h3 className="font-medium">调试信息</h3>
+                  </div>
+                  <Textarea
+                    value={error.stack || '无堆栈信息'}
+                    readOnly
+                    className="font-mono text-xs min-h-[200px]"
+                  />
+                  
+                  {errorData.originalError && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">原始错误</label>
+                      <Textarea
+                        value={formatJsonWithHighlight(errorData.originalError)}
+                        readOnly
+                        className="font-mono text-xs min-h-[100px]"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
           </div>
-        </div>
+        </Tabs>
 
-        <DialogFooter className="gap-2">
-          <Button
-            variant="outline"
-            onClick={copyErrorDetails}
-            className="flex items-center gap-2"
-          >
-            <Copy className="h-4 w-4" />
-            {copied ? "Copied!" : "Copy Details"}
-          </Button>
-          
-          {showSupport && (
+        <DialogFooter className="flex justify-between">
+          <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={() => window.open("mailto:support@linhao.space?subject=Payment Error&body=" + encodeURIComponent(`Error Details:\n${JSON.stringify(error, null, 2)}`), "_blank")}
+              onClick={copyErrorDetails}
               className="flex items-center gap-2"
             >
-              <ExternalLink className="h-4 w-4" />
-              Contact Support
+              <Copy className="h-4 w-4" />
+              {copied ? "已复制!" : "复制完整报告"}
             </Button>
-          )}
-          
-          {onRetry && (
             <Button
-              onClick={onRetry}
+              variant="outline"
+              onClick={sendErrorReport}
               className="flex items-center gap-2"
             >
-              <RefreshCw className="h-4 w-4" />
-              Retry Payment
+              <Mail className="h-4 w-4" />
+              发送错误报告
             </Button>
-          )}
-          
-          <Button variant="secondary" onClick={onClose}>
-            Close
+          </div>
+          <Button onClick={onClose} variant="default">
+            关闭
           </Button>
         </DialogFooter>
       </DialogContent>
