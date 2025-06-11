@@ -138,7 +138,7 @@ export async function createCheckoutSession(
   discountCode?: string
 ) {
   const requestId = `${userId}-${Date.now()}`;
-  const apiUrl = process.env.CREEM_API_URL + "/checkouts";
+  const apiUrl = process.env.CREEM_API_URL + "/v1/checkouts";
   
   // 记录详细的环境信息
   const environmentInfo = {

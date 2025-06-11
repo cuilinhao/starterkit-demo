@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
   // 测试4: 简单的checkout session创建测试（使用虚假数据）
   try {
     console.log("🧪 Testing checkout session creation...");
-    const checkoutResponse = await fetch(`${apiUrl}/checkouts`, {
+    const checkoutResponse = await fetch(`${apiUrl}/v1/checkouts`, {
       method: 'POST',
       headers: {
         'x-api-key': apiKey,
