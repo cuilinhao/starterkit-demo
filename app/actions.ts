@@ -137,10 +137,13 @@ export async function createCheckoutSession(
   credits_amount?: number,
   discountCode?: string
 ) {
+  const requestId = `${userId}-${Date.now()}`;
+  const apiUrl = process.env.CREEM_API_URL + "/checkouts";
+  
   try {
     const requestBody: any = {
       product_id: productId,
-      // request_id: `${userId}-${Date.now()}`, // use Unique request ID if you need
+      request_id: requestId,
       customer: {
         email: email,
       },
@@ -161,7 +164,16 @@ export async function createCheckoutSession(
       requestBody.discount_code = discountCode;
     }
 
-    const response = await fetch(process.env.CREEM_API_URL + "/checkouts", {
+    console.log("🚀 Creating checkout session:", {
+      productId,
+      email,
+      userId,
+      productType,
+      apiUrl,
+      requestId
+    });
+
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
         "x-api-key": process.env.CREEM_API_KEY!,
@@ -171,15 +183,84 @@ export async function createCheckoutSession(
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Creem API Error:", response.status, errorText);
-      throw new Error(`Failed to create checkout session: ${response.status}`);
+      let errorResponse: any = null;
+      let errorText = "";
+      
+      try {
+        errorText = await response.text();
+        // 尝试解析为JSON
+        if (errorText) {
+          try {
+            errorResponse = JSON.parse(errorText);
+          } catch {
+            // 如果不是JSON，保持原文本
+            errorResponse = errorText;
+          }
+        }
+      } catch (e) {
+        errorText = "Failed to read error response";
+      }
+
+      console.error("🚨 Creem API Error Details:", {
+        status: response.status,
+        statusText: response.statusText,
+        url: apiUrl,
+        requestId,
+        response: errorResponse,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
+      // 创建详细的错误对象
+      const detailedError = new Error(`Payment Error: ${response.status} - ${response.statusText}`);
+      (detailedError as any).details = {
+        status: response.status,
+        statusText: response.statusText,
+        url: apiUrl,
+        timestamp: new Date().toISOString(),
+        requestId,
+        response: errorResponse,
+        message: errorResponse?.message || errorResponse || `HTTP ${response.status} - ${response.statusText}`,
+        errorCode: errorResponse?.code || errorResponse?.error_code || `HTTP_${response.status}`
+      };
+
+      throw detailedError;
     }
 
     const data = await response.json();
+    console.log("✅ Checkout session created successfully:", {
+      requestId,
+      checkoutUrl: data.checkout_url
+    });
+    
     return data.checkout_url;
-  } catch (error) {
-    console.error("Error creating checkout session:", error);
-    throw error;
+  } catch (error: any) {
+    console.error("💥 Error creating checkout session:", {
+      error: error?.message || error,
+      stack: error?.stack,
+      details: error?.details,
+      requestId,
+      apiUrl
+    });
+    
+    // 如果是我们创建的详细错误，直接抛出
+    if (error?.details) {
+      throw error;
+    }
+    
+    // 否则包装为详细错误
+    const wrappedError = new Error(`Checkout Error: ${error?.message || 'Unknown error'}`);
+    (wrappedError as any).details = {
+      status: 0,
+      statusText: 'Network Error',
+      url: apiUrl,
+      timestamp: new Date().toISOString(),
+      requestId,
+      message: error?.message || 'Unknown error',
+      errorCode: 'NETWORK_ERROR',
+      response: null,
+      originalError: error?.message || error
+    };
+    
+    throw wrappedError;
   }
 }

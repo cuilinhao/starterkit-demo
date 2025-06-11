@@ -50,7 +50,14 @@ async function testPaymentAPI() {
   console.log('\n💳 测试支付API...');
   
   try {
+    // 首先测试健康检查
+    console.log('📋 检查支付API状态...');
+    const healthResponse = await fetch('http://localhost:3000/api/test-payment');
+    const healthData = await healthResponse.json();
+    console.log('🏥 API健康状态:', healthData);
+
     // 测试创建checkout session
+    console.log('\n🛒 测试创建支付会话...');
     const response = await fetch('http://localhost:3000/api/test-payment', {
       method: 'POST',
       headers: {
@@ -58,22 +65,29 @@ async function testPaymentAPI() {
       },
       body: JSON.stringify({
         productId: 'prod_2zG6xzCysT3tWDSCzN3FOJ', // Starter tier
-        email: 'test@example.com',
-        userId: 'test-user-id',
+        email: 'test@linhao.space',
+        userId: 'test-user-id-' + Date.now(),
         productType: 'subscription'
       })
     });
 
+    const result = await response.json();
+    
     if (response.ok) {
-      const result = await response.json();
       console.log('✅ 支付API正常');
-      console.log(`🔗 结果: ${JSON.stringify(result).substring(0, 100)}...`);
+      console.log(`🔗 Checkout URL: ${result.checkoutUrl}`);
+      console.log(`📝 消息: ${result.message}`);
     } else {
-      const error = await response.text();
-      console.log(`❌ 支付API失败: ${response.status} - ${error}`);
+      console.log(`❌ 支付API失败: ${response.status}`);
+      console.log('📄 错误详情:');
+      console.log(`   - 消息: ${result.error?.message}`);
+      console.log(`   - 状态: ${result.error?.details?.status}`);
+      console.log(`   - URL: ${result.error?.details?.url}`);
+      console.log(`   - 请求ID: ${result.error?.details?.requestId}`);
+      console.log(`   - 响应: ${JSON.stringify(result.error?.details?.response, null, 2)}`);
     }
   } catch (error) {
-    console.log(`❌ 支付API错误: ${error.message}`);
+    console.log(`❌ 支付API网络错误: ${error.message}`);
   }
 }
 

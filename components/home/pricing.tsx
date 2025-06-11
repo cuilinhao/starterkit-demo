@@ -7,11 +7,18 @@ import { createCheckoutSession } from "@/app/actions";
 import { useUser } from "@/hooks/use-user";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { ErrorDialog } from "@/components/ui/error-dialog";
+import { useState } from "react";
 
 export default function Pricing() {
   const { user } = useUser();
   const { toast } = useToast();
   const router = useRouter();
+  const [errorDialog, setErrorDialog] = useState<{
+    isOpen: boolean;
+    error?: any;
+    retryAction?: () => void;
+  }>({ isOpen: false });
 
   const handleSubscribe = async (productId: string, discountCode?: string) => {
     if (!user || !user.email) {
@@ -37,13 +44,24 @@ export default function Pricing() {
       if (checkoutUrl) {
         window.location.href = checkoutUrl;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating checkout session:", error);
-      toast({
-        title: "Error",
-        description: "Failed to create checkout session. Please try again.",
-        variant: "destructive",
-      });
+      
+      // 显示详细错误弹窗
+      if (error?.details) {
+        setErrorDialog({
+          isOpen: true,
+          error: error.details,
+          retryAction: () => handleSubscribe(productId, discountCode)
+        });
+      } else {
+        // 兜底简单错误提示
+        toast({
+          title: "Error",
+          description: error?.message || "Failed to create checkout session. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -75,13 +93,24 @@ export default function Pricing() {
       if (checkoutUrl) {
         window.location.href = checkoutUrl;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating checkout session:", error);
-      toast({
-        title: "Error",
-        description: "Failed to create checkout session. Please try again.",
-        variant: "destructive",
-      });
+      
+      // 显示详细错误弹窗
+      if (error?.details) {
+        setErrorDialog({
+          isOpen: true,
+          error: error.details,
+          retryAction: () => handleBuyCredits(productId, creditsAmount, discountCode)
+        });
+      } else {
+        // 兜底简单错误提示
+        toast({
+          title: "Error",
+          description: error?.message || "Failed to create checkout session. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -210,6 +239,17 @@ export default function Pricing() {
           </div>
         </div>
       </div>
+      
+      {/* 错误弹窗 */}
+      {errorDialog.error && (
+        <ErrorDialog
+          isOpen={errorDialog.isOpen}
+          onClose={() => setErrorDialog({ isOpen: false })}
+          error={errorDialog.error}
+          onRetry={errorDialog.retryAction}
+          showSupport={true}
+        />
+      )}
     </section>
   );
 }
