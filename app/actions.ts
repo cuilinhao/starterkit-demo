@@ -166,23 +166,24 @@ export async function createCheckoutSession(
   };
   
   try {
+    // 双保险确保总能拿到 success_url
+    const successUrl =
+      process.env.CREEM_SUCCESS_URL ??
+      `${process.env.NEXT_PUBLIC_SITE_URL}/payment/success`; // 双保险
+
     const requestBody: any = {
       product_id: productId,
       request_id: requestId,
       customer: {
         email: email,
       },
+      success_url: successUrl,          // ★ 不再缺失
       metadata: {
         user_id: userId,
         product_type: productType,
         credits: credits_amount || 0,
       },
     };
-
-    // 如果配置了成功重定向 URL，则添加到请求中
-    if (process.env.CREEM_SUCCESS_URL) {
-      requestBody.success_url = process.env.CREEM_SUCCESS_URL;
-    }
 
     // 添加折扣码（如果有）
     if (discountCode) {
@@ -214,22 +215,18 @@ export async function createCheckoutSession(
     });
 
     if (!response.ok) {
-      let errorResponse: any = null;
-      let errorText = "";
+      const text = await response.text();
+      console.error('Creem error →', response.status, text);   // 线上可直接定位
       
+      // 尝试解析错误响应
+      let errorResponse: any = null;
       try {
-        errorText = await response.text();
-        // 尝试解析为JSON
-        if (errorText) {
-          try {
-            errorResponse = JSON.parse(errorText);
-          } catch {
-            // 如果不是JSON，保持原文本
-            errorResponse = errorText;
-          }
+        if (text) {
+          errorResponse = JSON.parse(text);
         }
-      } catch (e) {
-        errorText = "Failed to read error response";
+      } catch {
+        // 如果不是JSON，保持原文本
+        errorResponse = text;
       }
 
       console.error("🚨 Creem API Error Details:", {
@@ -242,7 +239,7 @@ export async function createCheckoutSession(
       });
 
       // 创建详细的错误对象
-      const detailedError = new Error(`Payment Error: ${response.status} - ${response.statusText}`);
+      const detailedError = new Error(`creem-${response.status}`);
       (detailedError as any).details = {
         status: response.status,
         statusText: response.statusText,
