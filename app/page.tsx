@@ -7,6 +7,7 @@ import Contact from "@/components/home/contact";
 import LogoCloud from "@/components/home/logocloud";
 import { NovelGenerator } from "@/components/product/novel-generator";
 
+//---test vercel auto deploy
 export default async function Home() {
   return (
     <div className="flex flex-col gap-8 md:gap-12 lg:gap-24">
