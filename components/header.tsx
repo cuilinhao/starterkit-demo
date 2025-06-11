@@ -23,6 +23,7 @@ export default function Header({ user }: HeaderProps) {
 
   // Main navigation items that are always shown
   const mainNavItems: NavItem[] = [
+    { label: "AI创作", href: "#novel-generator" },
     { label: "Features", href: "#features" },
     { label: "Pricing", href: "#pricing" },
     { label: "FAQ", href: "#faq" },

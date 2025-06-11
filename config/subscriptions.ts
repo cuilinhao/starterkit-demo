@@ -4,8 +4,8 @@ export const SUBSCRIPTION_TIERS: ProductTier[] = [
   {
     name: "Starter",
     id: "tier-hobby",
-    productId: "prod_1D7nRGnyQntnvGB9IZATjc", // $11 monthly subscription
-    priceMonthly: "$11",
+    productId: "prod_2zG6xzCysT3tWDSCzN3FOJ", // $9 monthly subscription
+    priceMonthly: "$9",
     description: "Perfect for individual developers and small projects.",
     features: [
       "Global authentication system",
@@ -21,8 +21,8 @@ export const SUBSCRIPTION_TIERS: ProductTier[] = [
   {
     name: "Business",
     id: "tier-pro",
-    productId: "prod_1D7nRGnyQntnvGB9IZATjc", // $29 monthly subscription
-    priceMonthly: "$29",
+    productId: "prod_2HL8N4jL1b74mfO1g1bHr0", // $15 monthly subscription
+    priceMonthly: "$15",
     description: "Ideal for growing businesses and development teams.",
     features: [
       "Everything in Starter",
@@ -38,8 +38,8 @@ export const SUBSCRIPTION_TIERS: ProductTier[] = [
   {
     name: "Enterprise",
     id: "tier-enterprise",
-    productId: "prod_1D7nRGnyQntnvGB9IZATjc", // $99 monthly subscription
-    priceMonthly: "$99",
+    productId: "prod_5WDI83ypxnCVBsBBsl7IRI", // $150 monthly subscription
+    priceMonthly: "$150",
     description: "For large organizations with advanced requirements.",
     features: [
       "Everything in Business",
